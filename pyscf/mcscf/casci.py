@@ -295,6 +295,8 @@ def cas_natorb(mc, mo_coeff=None, ci=None, eris=None, sort=False,
     elif getattr(mc.fcisolver, 'states_transform_ci_for_orbital_rotation', None):
         fcivec = mc.fcisolver.states_transform_ci_for_orbital_rotation(ci, ncas, nelecas, ucas)
 
+    # Rerun fcisolver to get wavefunction if it cannot be transformed from
+    # existed one.
     if fcivec is None:
         log.info('FCI vector not available, call CASCI to update wavefunction')
         mocas = mo_coeff1[:,ncore:nocc]
@@ -606,17 +608,16 @@ class CASCI(lib.StreamObject):
         ncore : int or tuple of int
             Core electron number.  In UHF-CASSCF, it's a tuple to indicate the different core eletron numbers.
         natorb : bool
-            Whether to transform natural orbital in active space.  Be cautious
-            of this parameter when CASCI/CASSCF are combined with DMRG solver
-            or selected CI solver because DMRG and selected CI are not invariant
-            to the rotation in active space.
+            Whether to transform natural orbitals in active space.
+            Note: when CASCI/CASSCF are combined with DMRG solver or selected
+            CI solver, enabling this parameter may slightly change the total energy.
             False by default.
         canonicalization : bool
-            Whether to canonicalize orbitals. Note that canonicalization does
-            not change the orbitals in active space by default. It only
-            diagonalizes core and external space of the general Fock matirx.
-            To get the natural orbitals in active space, attribute natorb
-            need to be enabled.
+            Whether to canonicalize orbitals in core and external space
+            against the general Fock matrix.
+            The orbitals in active space are NOT transformed by default. To
+            get the natural orbitals in active space, the attribute .natorb
+            needs to be enabled.
             True by default.
         sorting_mo_energy : bool
             Whether to sort the orbitals based on the diagonal elements of the
@@ -874,6 +875,14 @@ To enable the solvent model for CASCI, the following code needs to be called
             self.canonicalize_(mo_coeff, self.ci,
                                sort=self.sorting_mo_energy,
                                cas_natorb=self.natorb, verbose=log)
+        elif self.natorb:
+            # FIXME (pyscf-2.0): Whether to transform natural orbitals in
+            # active space when this flag is enabled?
+            log.warn('The attribute .natorb of mcscf object affects only the '
+                     'orbital canonicalization.\n'
+                     'If you would like to get natural orbitals in active space '
+                     'without touching core and external orbitals, an explicit '
+                     'call to mc.cas_natorb_() is required')
 
         if getattr(self.fcisolver, 'converged', None) is not None:
             self.converged = numpy.all(self.fcisolver.converged)
